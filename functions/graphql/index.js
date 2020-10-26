@@ -46,7 +46,7 @@ const resolvers = {
           data: {
             text,
             completed: false,
-            owner,
+            owner: user,
           },
         })
       );
