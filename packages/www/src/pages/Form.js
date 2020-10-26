@@ -1,17 +1,46 @@
 import React, { useState } from "react";
+import { useMutation, useQuery, gql } from "@apollo/client";
+
+const ADD_TODO = gql`
+  mutation AddTodo($text: String!) {
+    addTodo(text: $text) {
+      id
+    }
+  }
+`;
+
+const UPDATE_TODO = gql`
+  mutation UpdateTodo($id: ID!) {
+    updateTodo(id: $id) {
+      completed
+    }
+  }
+`;
+
+const GET_TODOS = gql`
+  query GetTodos {
+    todos {
+      id
+      text
+      completed
+    }
+  }
+`;
 
 const Form = () => {
   const [todo, setTodo] = useState({
     text: "",
     completed: false,
   });
+  const [addTodo] = useMutation(ADD_TODO);
+  const [updateTodo] = useMutation(UPDATE_TODO);
+  const { loading, error, data, refetch } = useQuery(GET_TODOS);
 
-  const [todos, setTodos] = useState([]);
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setTodos([{ text: todo.text, completed: todo.completed }, ...todos]);
-    setTodo({ text: "", completed: false });
+    await addTodo({ variables: { text: todo.text } });
+    await refetch();
+    setTodo({ ...todo, text: "" });
   };
   return (
     <div>
@@ -27,13 +56,24 @@ const Form = () => {
         </div>
         <button className="btn-outline-info btn-block">ADD</button>
       </form>
+      {loading ? <h5>Loading...</h5> : null}
+      {error ? <p className="text-danger">{error.message}</p> : null}
       <ul className="list-group">
-        {todos.map((el, i) => (
-          <li className="list-group-item mt-2" key={i}>
-            <input type="checkbox" checked={el.completed} />
-            <span className="ml-2">{el.text}</span>
-          </li>
-        ))}
+        {!loading &&
+          !error &&
+          data.todos.map((el, i) => (
+            <li className="list-group-item mt-2" key={i}>
+              <input
+                type="checkbox"
+                checked={el.completed}
+                onClick={async () => {
+                  await updateTodo({ variables: { id: el.id } });
+                  await refetch();
+                }}
+              />
+              <span className="ml-2">{el.text}</span>
+            </li>
+          ))}
       </ul>
     </div>
   );
