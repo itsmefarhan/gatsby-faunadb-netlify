@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@apollo/client": "^3.2.5",
+    "apollo-link-context": "^1.0.20",
     "bootstrap": "^4.5.3",
     "gatsby": "^2.24.87",
     "isomorphic-fetch": "^3.0.0",
