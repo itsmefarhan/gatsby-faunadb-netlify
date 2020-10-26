@@ -1,4 +1,8 @@
 const { ApolloServer, gql } = require("apollo-server-lambda");
+const faunadb = require("faunadb");
+const q = faunadb.query;
+
+const client = new faunadb.Client({ secret: process.env.FAUNADB });
 
 const typeDefs = gql`
   type Query {
@@ -15,23 +19,58 @@ const typeDefs = gql`
   }
 `;
 
-const todos = {};
-let todoIndex = 0;
-
 const resolvers = {
   Query: {
-    todos: () => Object.values(todos),
+    todos: async (parent, args, { user }) => {
+      if (!user) {
+        return [];
+      } else {
+        const result = await client.query(
+          q.Paginate(q.Match(q.Index("todos_by_user"), user))
+        );
+        return result.data.map(([ref, text, completed]) => ({
+          id: ref.id,
+          text,
+          completed,
+        }));
+      }
+    },
   },
   Mutation: {
-    addTodo: (_, { text }) => {
-      todoIndex++;
-      const id = todoIndex;
-      todos[id] = { id, text, completed: false };
-      return todos[id];
+    addTodo: async (_, { text }, { user }) => {
+      if (!user) {
+        throw new Error("User not found");
+      }
+      const result = await client.query(
+        q.Create(q.Collection("todos"), {
+          data: {
+            text,
+            completed: false,
+            owner,
+          },
+        })
+      );
+
+      return {
+        ...result.data,
+        id: result.ref.id,
+      };
     },
-    updateTodo: (_, { id }) => {
-      todos[id].completed = true;
-      return todos[id];
+    updateTodo: async (_, { id }, { user }) => {
+      if (!user) {
+        throw new Error("User not found");
+      }
+      const result = await client.query(
+        q.Update(q.Ref(q.Collection("todos"), id), {
+          data: {
+            completed: true,
+          },
+        })
+      );
+      return {
+        ...result.data,
+        id: result.ref.id,
+      };
     },
   },
 };
@@ -39,6 +78,13 @@ const resolvers = {
 const server = new ApolloServer({
   typeDefs,
   resolvers,
+  context: ({ context }) => {
+    if (context.clientContext.user) {
+      return { user: context.clientContext.user.sub };
+    } else {
+      return {};
+    }
+  },
   introspection: true,
   playground: true,
 });
