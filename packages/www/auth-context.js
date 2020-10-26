@@ -17,7 +17,10 @@ const AuthProvider = ({ children }) => {
     setUser(user);
   });
 
-  netlifyIdentity.on("logout", () => setUser());
+  netlifyIdentity.on("logout", () => {
+    netlifyIdentity.close();
+    setUser();
+  });
 
   return (
     <AuthContext.Provider value={{ netlifyIdentity, user }}>
